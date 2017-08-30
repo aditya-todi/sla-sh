@@ -6,6 +6,9 @@
 #include <string.h>
 #include <dirent.h>
 #include <time.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#include <stdlib.h>
 
 void slashloop();
 void print_prompt();
@@ -128,16 +131,16 @@ void slash_ls(char **args)
 					}
 					else
 					{
-						perm[i+1]=45;
+						perm[i+1]='-';
 					}
 				}
 				if(permissions>>15)
 				{
-					perm[0]=45;
+					perm[0]='-';
 				}
 				else
 				{
-					perm[0]=100;
+					perm[0]='d';
 				}
 				i=10;
 				struct tm *time;
@@ -152,6 +155,115 @@ void slash_ls(char **args)
 		}
 	}
 }
+
+void slash_pinfo(char** args)
+{
+	int i=0;
+	while(args[i]!=NULL)
+		i++;
+
+	if(i==2)
+	{
+		char statPath[100]={"/proc/"};
+		strcat(statPath, args[1]);
+		strcat(statPath, "/stat");
+		int fd_file1;
+		fd_file1=open(statPath, O_RDONLY);
+		if(fd_file1>0)
+		{
+			char buf[1000];
+			read(fd_file1, buf, 1000);
+			char* arr[100];
+			int i=0;
+			for(i=0; i<100; i++)
+				arr[i]=NULL;
+
+			i=0;
+			for(char *p=strtok(buf, " "); p!=NULL; p=strtok(NULL, " "), i++)
+			{
+				arr[i]=p;
+			}
+
+			printf("PID: %s\nProcess Status: %s\nVirtual Memory: %s\nFile Name: %s\n", arr[0], arr[2], arr[25], arr[1]);
+		}
+		else
+		{
+			printf("Error in finding process, make sure this pid exists\n");
+		}
+	}
+	else
+	{
+		int pid=getpid();
+		char* argu[2];
+		argu[0]=args[0];
+		argu[1]=malloc(1000);
+		sprintf(argu[1], "%d", pid);
+		slash_pinfo(argu);
+	}
+}
+
+void slash_nightswatch(char** args)
+{
+	char* options=args[1];
+	char* command=args[2];
+	printf("%s %s\n", options, command);
+	// while(1)
+	// {
+	char sleep[10];
+	slash_send(sleep);
+		// printf("LOL\n");		
+	// }
+}
+
+void slash_exec(char **args)
+{
+	// pid_t parent;
+	pid_t pid1;
+	pid_t pid2;
+	int len=strlen(args[0]);
+	pid1=fork();
+	if(args[0][len-1]!='&')
+	{
+		if(pid1==0) //child
+		{
+			if(execvp(args[0], args)==-1)
+			{
+				printf("%s: Command not found\n", args[0]);
+			}
+		}
+		else if(pid1<0)
+		{
+			printf("Error in forking\n");
+		}
+		else //parent
+		{
+			wait(NULL);
+			// exit(0);
+		}
+	}
+	else
+	{
+		if(pid1==0)
+		{
+			pid2=fork();
+			if(pid2==0) //grandchild
+			{
+				pid_t child=getppid();
+				args[0][len-1]=0;
+				// setpgid(0, 0);
+				printf("%d STARTED\n", child);
+				execvp(args[0], args);
+			}
+			else if(pid2!=0) //child
+			{
+				wait(NULL);
+				printf("%d DONE\n", pid2);
+				exit(0);
+			}
+		}
+	}
+}
+
 
 void slashloop()
 {
@@ -192,11 +304,11 @@ void print_prompt()
 		{
 			e[i]=cwd[i+len-1];
 		}
-	printf("<%s@%s:%s> ", username, hostname, e);
+	printf("\033[1;32m<%s@%s:\033[1;34m%s\033[1;32m>\033[0m$ ", username, hostname, e);
 	}
 	else
 	{
-		printf("<%s@%s:%s> ", username, hostname, cwd);
+		printf("\033[1;32m<%s@%s:\033[1;34m%s\033[1;32m>\033[0m$ ", username, hostname, cwd);
 	}
 }
 
@@ -208,11 +320,17 @@ void read_command()
 	{
 		input[i]=0;
 	}
-	fgets(input, 100, stdin);
-	int len=strlen(input);
-	input[len-1]=0; //replaces the last "\n" with a "\0"
-	split_command(input);
-	// printf("You typed: '%s'\n",buffer);
+	if(fgets(input, 100, stdin))
+	{
+		int len=strlen(input);
+		input[len-1]=0; //replaces the last "\n" with a "\0"
+		split_command(input);
+	}
+	else
+	{
+		//
+		printf("\n");
+	}
 }
 
 void split_command(char* str)
@@ -235,18 +353,6 @@ void split_command(char* str)
 		}
 	}
 	int noOfCommands=i;
-	// for(i=0; i<noOfCommands; i++)
-	// {
-	// }
-	// for(i=0; i<noOfCommands; i++)
-	// {
-	// 	j=0;
-	// 	while(commands[i][j]!=0)
-	// 	{
-	// 		printf("%c\n", commands[i][j]);
-	// 		j++;
-	// 	}
-	// }	
 	for(j=0; j<noOfCommands; j++)
 	{
 		slash_send(commands[j]);
@@ -265,12 +371,7 @@ void slash_send(char *args)
 	{
 		arr[i]=p;
 	}
-	// i=0;
-	// while(arr[i]!=NULL)
-	// {
-	// 	printf("%s\n", arr[i]);
-	// 	i++;
-	// }
+
 	slash_execute(arr);
 }
 
@@ -280,19 +381,31 @@ void slash_execute(char** args)
 	{
 		slash_cd(args);
 	}
-	if(!strcmp(args[0], "pwd"))
+	else if(!strcmp(args[0], "pwd"))
 	{
 		slash_pwd(args);
 	}
-	if(!strcmp(args[0], "echo"))
+	else if(!strcmp(args[0], "echo"))
 	{
 		int i;
 		for(i=0; args[i]!=NULL; i++);
 		slash_echo(args, i);
 	}
-	if(!strcmp(args[0], "ls"))
+	else if(!strcmp(args[0], "ls"))
 	{
 		slash_ls(args);
+	}
+	else if(!strcmp(args[0], "pinfo"))
+	{
+		slash_pinfo(args);
+	}
+	else if(!strcmp(args[0], "nightswatch"))
+	{
+		slash_nightswatch(args);
+	}
+	else
+	{
+		slash_exec(args);
 	}
 }
 
