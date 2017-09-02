@@ -204,15 +204,42 @@ void slash_pinfo(char** args)
 
 void slash_nightswatch(char** args)
 {
-	char* options=args[1];
-	char* command=args[2];
-	printf("%s %s\n", options, command);
-	// while(1)
-	// {
-	char sleep[10];
-	slash_send(sleep);
-		// printf("LOL\n");		
-	// }
+	char* options=args[1]; //-n
+	char* time=args[2]; //5
+	char* command=args[3]; //interr
+	while(1)
+	{
+		char** sleep=malloc(1000);
+		sleep[0]="sleep";
+		sleep[1]=malloc(1000);
+		sleep[1]=time;
+		slash_execute(sleep);
+		if(!strcmp(args[3], "interrupt"))
+		{
+			int fd_file=open("/proc/interrupts", 10000);
+			char bufa[10100];
+			read(fd_file, bufa, 10000);
+			
+			char* arr[100];
+			char* p=NULL;
+			int i=0;
+			for(i=0; i<100; i++)
+				arr[i]=NULL;
+
+			i=0;
+			printf("%s asd\n", bufa);
+
+			for(p=strtok(bufa, "\n"); p!=NULL; p=strtok(NULL, "\n"), i++)
+			{
+				arr[i]=p;
+			}
+		}
+		else if(!strcmp(args[3], "dirty"))
+		{
+			printf("dirty");
+		}
+		printf("LOL\n");		
+	}
 }
 
 void slash_exec(char **args)
@@ -343,7 +370,8 @@ void split_command(char* str)
 		for(j=0; j<100; j++)
 			commands[i][j]=0;
 	i=0;
-	for (char *p = strtok(str,";"); p != NULL; p = strtok(NULL, ";"), i++)
+
+	for (p = strtok(str,";"); p != NULL; p = strtok(NULL, ";"), i++)
 	{
 		int j=0;
 		int len=strlen(p);
@@ -362,16 +390,20 @@ void split_command(char* str)
 void slash_send(char *args)
 {
 	char* arr[100];
+	char* p=NULL;
 	int i=0;
 	for(i=0; i<100; i++)
 		arr[i]=NULL;
 
 	i=0;
-	for(char *p=strtok(args, " "); p!=NULL; p=strtok(NULL, " "), i++)
+
+	// printf("1\n");
+	// printf("%s\n", args);
+	for(p=strtok(args, " "); p!=NULL; p=strtok(NULL, " "), i++)
 	{
 		arr[i]=p;
 	}
-
+	// printf("%s %s\n", arr[0], arr[1]);
 	slash_execute(arr);
 }
 
