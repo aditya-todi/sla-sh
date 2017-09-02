@@ -2,7 +2,7 @@
 CFLAGS = -Wall -g
 
 # The final executable program file, i.e. name of our program
-BIN = main
+BIN = slash
 
 # Object files from which $BIN depends
 # OBJS = module1.o module2.o module3.o
