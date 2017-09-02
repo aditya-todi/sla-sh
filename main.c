@@ -63,6 +63,26 @@ int slash_echo(char **args, int noOfArgs) {
 }
 
 void slash_ls(char **args) {
+  int i = 0, flags[2] = {0}; // flags 00=ls, 01=ls -a, 10=ls -l, 11=ls -l -a
+  while (args[i] != NULL)
+    i++;
+
+  if (i == 3) {
+    flags[0] = flags[1] = 1;
+  } else if (i == 2) {
+    if (strlen(args[1]) == 3) {
+      flags[0] = flags[1] = 1;
+    } else {
+      if (args[1][1] == 'l') {
+        flags[0] = 1;
+        flags[1] = 0;
+      } else if (args[1][1] == 'a') {
+        flags[0] = 0;
+        flags[1] = 1;
+      }
+    }
+  }
+
   char cwd[100];
   getcwd(cwd, 100);
   DIR *currDir;
@@ -70,7 +90,7 @@ void slash_ls(char **args) {
   currDir = opendir(cwd);
   struct stat fileDetails = {0};
 
-  if (args[1] == NULL) // only ls
+  if (flags[0] == 0 && flags[1] == 0) // only ls
   {
     if (currDir != NULL) {
       while (currFile = readdir(currDir)) {
@@ -81,7 +101,7 @@ void slash_ls(char **args) {
     }
   }
 
-  else if (args[1][1] == 97 && args[1][2] == 0) // only ls -a
+  else if (flags[0] == 0 && flags[1] == 1) // only ls -a
   {
     if (currDir != NULL) {
       while (currFile = readdir(currDir)) {
@@ -90,7 +110,7 @@ void slash_ls(char **args) {
     }
   }
 
-  else if (args[1][1] == 108) // only ls -l
+  else if (flags[0] == 1) // only ls -l
   {
     printf("Permissions      Size Date        Name\n");
     printf("---------------------------------------\n");
@@ -121,10 +141,12 @@ void slash_ls(char **args) {
         char date[100];
         time = localtime(&fileDetails.st_mtime);
         strftime(date, 100, "%m %d %H:%M", time);
-        printf("%s ", perm);
-        printf("%*ld ", i, fileDetails.st_size);
-        printf("%s ", date);
-        printf("%s\n", currFile->d_name);
+        if (!(flags[1] == 0 && currFile->d_name[0] == 46)) {
+          printf("%s ", perm);
+          printf("%*ld ", i, fileDetails.st_size);
+          printf("%s ", date);
+          printf("%s\n", currFile->d_name);
+        }
       }
     }
   }
